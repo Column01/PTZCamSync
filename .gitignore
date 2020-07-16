@@ -1,0 +1,6 @@
+*.code-workspace
+.vscode/
+PTZCamSync/
+build/
+__pycache__/
+*.json
