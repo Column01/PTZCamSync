@@ -3,6 +3,8 @@ import sys
 import os
 from obs_handler import OBSWebsocketHandler
 
+# Changes an internal path variable based on whether the application was built into an EXE or not.
+# Will be used for builds later on
 if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
     __location__ = os.path.dirname(sys.executable)
 else:

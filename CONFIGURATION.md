@@ -12,9 +12,9 @@ Create a new JSON object in the `cameras` section of the file with the following
 - `address`
     -The camera's IP address on your local network to send it requests
 - `presets` (json array)
-    - preset_num 
+    - `preset_num`
         - The camera's preset number you want to use for this preset. This should have restrictions for what it can be. Check your camera's manual for details
-    - obs_scene 
+    - `obs_scene`
         - The name of the OBS scene you want this preset to correspond to
 
 

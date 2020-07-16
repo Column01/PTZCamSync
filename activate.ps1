@@ -1,1 +1,1 @@
-./PTZCamSync/Scripts/Activate.ps1
+PTZCamSync\Scripts\activate
