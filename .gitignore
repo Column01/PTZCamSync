@@ -4,3 +4,4 @@ PTZCamSync/
 build/
 __pycache__/
 *.json
+dist/
