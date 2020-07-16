@@ -24,11 +24,11 @@ Create a new JSON object in the `cameras` section of the file with the following
       "password": "$tr0ng_pa$$w0rd",
       "cameras": [
         {   
-          "id": "1",
+          "id": 1,
           "address": "192.168.1.88",
           "presets": [
-            {"preset_num": "1", "obs_scene": "Example Scene Name"},
-            {"preset_num": "2", "obs_scene": "Example Scene Name 2"}
+            {"preset_num": 1, "obs_scene": "Example Scene Name"},
+            {"preset_num": 2, "obs_scene": "Example Scene Name 2"}
           ]
         }
       ]

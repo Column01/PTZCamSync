@@ -19,9 +19,12 @@ class PTZCamSync:
         self.ws = self.ws_handler.ws
     
     def change_scene(self, camera_id, preset_num):
+        # Get the camera and scene na,e
         camera = self._get_camera(camera_id)
         scene = self._get_scene_for_preset(camera, preset_num)
+        # Get the camera's IP address
         # address = camera["address"]
+        # Change the OBS Scene
         self.ws_handler.change_scene(scene)
 
     def _get_camera(self, camera_id):
@@ -38,4 +41,4 @@ class PTZCamSync:
  
 if __name__ == "__main__":
     cam_sync = PTZCamSync()
-    cam_sync.change_scene("1", "1")
+    cam_sync.change_scene(1, 1)
