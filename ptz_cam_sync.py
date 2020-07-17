@@ -1,6 +1,7 @@
 from functools import partial
 import json
 import os
+import requests as req
 import sys
 from tkinter import Tk, font, Frame, Button
 
@@ -43,6 +44,8 @@ class PTZCamSync:
         self.ws_handler = OBSWebsocketHandler("127.0.0.1", 4444, self.settings["password"])
         self.ws = self.ws_handler.ws
 
+        self.camera_preset_url = "http://{address}/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&{preset_num}"
+
     def change_scene(self, camera_id, preset_num):
         # Get the camera and scene name
         camera = self._get_camera(camera_id)
@@ -56,11 +59,18 @@ class PTZCamSync:
             print("An OBS scene was not found for camera ID {} and preset number {}. "
                   "Please make sure you have it configured correctly.".format(camera_id, preset_num))
             return
-        # Get the camera's IP address
-        address = camera["address"]
-        del address
+
         # Change the OBS Scene
         self.ws_handler.change_scene(scene)
+
+        # Get the camera's IP address
+        address = camera["address"]
+        formatted_url = self.camera_preset_url.format(address=address, preset_num=preset_num)
+        # Send camera control signal
+        resp = req.post(formatted_url)
+        if resp.status_code != 200:
+            print("Error sending a camera a preset command. "
+                  "Camera Address: {}, Preset Num: {}".format(address, preset_num))
         
     def get_all_cameras(self):
         return [camera for camera in self.settings["cameras"]]
@@ -99,12 +109,12 @@ if __name__ == "__main__":
     cam_sync = PTZCamSync()
     cameras = cam_sync.get_all_cameras()
     
+    # Setup Tkinter buttons to change OBS scenes and change camera presets.
     for camera in cameras:
         cam_frame = Frame(main_frame)
         cam_frame.configure(bg=background_color)
         cam_frame.pack(fill="x")
         cam_id = camera["id"]
-        # cam_address = camera["address"]
         presets = camera["presets"]
         for preset in presets:
             preset_id = preset["preset_num"]
@@ -112,4 +122,5 @@ if __name__ == "__main__":
             btn = Button(cam_frame, text=title, font=font, bg=btn_background_color, fg=text_color, command=partial(cam_sync.change_scene, cam_id, preset_id))
             btn.pack(padx=5, pady=5, side="left")
 
+    # Start the app
     root.mainloop()
