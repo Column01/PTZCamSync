@@ -27,7 +27,7 @@ class OBSWebsocketHandler:
             self.ws.connect()
         except exceptions.ConnectionFailure:
             print("Connection was unsuccessful")
-            sys.exit("OBS Must be open in order to use this application")
+            do_exit("OBS Must be open in order to use this application")
 
         # Get the scenes from OBS
         self.scenes = self._get_scenes()
@@ -85,6 +85,13 @@ class PTZCamSync:
         return None
 
 
+def do_exit(message):
+    print("The program ran into an error:")
+    print(message)
+    input("Press ENTER to exit...")
+    sys.exit()
+
+
 if __name__ == "__main__":
     # Main window
     root = Tk("PTZCamSync")
@@ -124,7 +131,8 @@ if __name__ == "__main__":
                 print("The scene \"{}\" was not found in your OBS configuration.".format(scene))
 
     if len(buttons) == 0:
-        sys.exit("Could not find any valid OBS scenes in the config. Please make sure you have them named correctly in the configuration.")
+        do_exit("Could not find any valid OBS scenes in the config. Please make sure you have them named correctly in the configuration.")
+
     root.update()
     # Makes width = 200 if it's less than that
     width = root.winfo_width() if root.winfo_width() >= 300 else 300
