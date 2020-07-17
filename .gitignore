@@ -6,3 +6,5 @@ __pycache__/
 *.json
 dist/
 server.py
+*.spec
+ptz_cam_sync.exe
