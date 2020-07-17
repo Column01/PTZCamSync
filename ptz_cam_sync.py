@@ -15,7 +15,7 @@ if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
 else:
     __location__ = os.path.realpath(os.path.join(os.getcwd(),
                                     os.path.dirname(__file__)))
-    
+
 
 class OBSWebsocketHandler:
     """Class that handles communication with OBS and the websocket"""
@@ -27,14 +27,14 @@ class OBSWebsocketHandler:
             self.ws.connect()
         except exceptions.ConnectionFailure:
             print("Connection was unsuccessful")
-            exit("OBS Must be open in order to use this application")
+            sys.exit("OBS Must be open in order to use this application")
 
         # Get the scenes from OBS
         self.scenes = self._get_scenes()
 
     def _get_scenes(self):
         return self.ws.call(requests.GetSceneList()).getScenes()
-    
+
     def change_scene(self, name):
         """Changes the current OBS scene"""
         self.ws.call(requests.SetCurrentScene(name))
@@ -54,7 +54,7 @@ class PTZCamSync:
     def change_scene(self, camera_id, preset_num, scene, address):
         # Change the OBS Scene
         self.ws_handler.change_scene(scene)
-        
+
         # Format the camera control URL
         formatted_url = self.camera_preset_url.format(address=address, preset_num=preset_num)
         # Send camera control message
@@ -67,7 +67,7 @@ class PTZCamSync:
             print("There was an error when trying to switch the camera's position. "
                   "This could mean your camera address is wrong or the camera is off. \n"
                   "Camera Address: {}, Preset Num: {}".format(address, preset_num))
-        
+
     def get_all_cameras(self):
         return [camera for camera in self.settings["cameras"]]
 
@@ -89,18 +89,18 @@ if __name__ == "__main__":
     # Main window
     root = Tk("PTZCamSync")
     root.title("PTZCamSync")
-    
+
     # Some constants for use later
     font = font.Font(family="Helvetica Neue", size=14)
     background_color = "#333333"
     btn_background_color = "#655F5F"
     text_color = "#FFFFFF"
-    
+
     # Main window frame
     main_frame = Frame(root)
     main_frame.configure(bg=background_color)
     main_frame.pack(fill="both", expand=1)
-    
+
     # Camera management class init. Also starts the websocket
     cam_sync = PTZCamSync()
     cameras = cam_sync.get_all_cameras()
@@ -124,7 +124,7 @@ if __name__ == "__main__":
                 print("The scene \"{}\" was not found in your OBS configuration.".format(scene))
 
     if len(buttons) == 0:
-        exit("Could not find any valid OBS scenes in the config. Please make sure you have them named correctly in the configuration.")
+        sys.exit("Could not find any valid OBS scenes in the config. Please make sure you have them named correctly in the configuration.")
     root.update()
     # Makes width = 200 if it's less than that
     width = root.winfo_width() if root.winfo_width() >= 300 else 300
