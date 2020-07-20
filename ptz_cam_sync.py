@@ -51,7 +51,7 @@ class PTZCamSync:
         self.obs_scenes = [x["name"] for x in self.ws_handler.scenes]
         self.camera_preset_url = "http://{address}/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&{preset_num}"
 
-    def change_scene(self, camera_id, preset_num, scene, address):
+    def change_scene(self, preset_num, scene, address):
         # Change the OBS Scene
         self.ws_handler.change_scene(scene)
 
@@ -59,14 +59,15 @@ class PTZCamSync:
         formatted_url = self.camera_preset_url.format(address=address, preset_num=preset_num)
         # Send camera control message
         try:
-            resp = req.post(formatted_url, timeout=0.001)
+            resp = req.get(formatted_url, timeout=0.1)
             if resp.status_code != 200:
                 print("Error sending a camera a preset command. "
                       "Camera Address: {}, Preset Num: {}. Status Code: {}".format(address, preset_num, resp.status_code))
-        except req.exceptions.RequestException:
+        except req.exceptions.RequestException as e:
             print("There was an error when trying to switch the camera's position. "
                   "This could mean your camera address is wrong or the camera is off. \n"
                   "Camera Address: {}, Preset Num: {}".format(address, preset_num))
+            print("\nException: {}".format(e))
 
     def get_all_cameras(self):
         return [camera for camera in self.settings["cameras"]]
@@ -117,14 +118,13 @@ if __name__ == "__main__":
         cam_frame = Frame(main_frame)
         cam_frame.configure(bg=background_color)
         cam_frame.pack(fill="x")
-        cam_id = camera["id"]
         cam_address = camera["address"]
         presets = camera["presets"]
         for preset in presets:
             preset_id = preset["preset_num"]
             scene = preset["obs_scene"]
             if scene in cam_sync.obs_scenes:
-                btn = Button(cam_frame, text=scene, font=font, bg=btn_background_color, fg=text_color, command=partial(cam_sync.change_scene, cam_id, preset_id, scene, cam_address))
+                btn = Button(cam_frame, text=scene, font=font, bg=btn_background_color, fg=text_color, command=partial(cam_sync.change_scene, preset_id, scene, cam_address))
                 btn.pack(padx=5, pady=5, side="left")
                 buttons.append(btn)
             else:

@@ -1,13 +1,17 @@
 # PTZCamSync
-A simple application that will (hopefully) allow users to manage PTZ Optics cameras and OBS scene switching with a simple click of a button
+A simple application that allows users to manage [PTZ Optics](https://ptzoptics.com/) cameras and [OBS Studio](https://obsproject.com/) scene switching with a simple click of a button
 
 # Setup
-Clone the repository to a folder you'd like to use for the program
+
+### Note
+You can skip the python setup section by downloading the latest release of the program [here](https://github.com/Column01/PTZCamSync/releases)
+
+If you'd like to play with the source directly, clone the repository to a folder you'd like to use for the program and follow along with all steps below.
 
 ### Setup Python Environment
 
 1. Install Python 3.6+ 64bit
-2. Create a python venv called "PTZCamSync" and run the provided `activate.ps1` script to activate it.
+2. Create a python venv called "PTZCamSync" and activate it.
 3. Run: `pip install -r requirements.txt` in this new command prompt to install all dependencies
 
 ### Configure OBS

@@ -1,2 +1,0 @@
-PTZCamSync\Scripts\activate
-pyinstaller ptz_cam_sync.py

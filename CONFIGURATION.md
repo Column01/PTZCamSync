@@ -1,6 +1,7 @@
 # Configuring the application
 
-Create a file called `settings.json` in the root folder of the application
+All changes are made in the included `settings.json` file. 
+If you downloaded the repo directly, there is an example config at the end you can copy and create the file manually.
 
 Inside it you will need to copy the text at the bottom of this page and paste it. You will need to change values as needed. Use a JSON linter to verify you didn't mess it up.
 
