@@ -86,8 +86,14 @@ class PTZCamSync:
         return None
     
     def _handle_close(self):
-        for _, ptz_visca in self._cam_sockets:
-            ptz_visca.close()
+        for camera in self.cameras:
+            address = camera.get("address")
+            if address is None:
+                continue
+            ptz_visca = self._cam_sockets.get(address)
+            if ptz_visca is not None:
+                ptz_visca.close()
+        exit(0)
 
 
 def do_exit(message):

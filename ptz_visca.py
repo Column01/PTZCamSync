@@ -1,4 +1,5 @@
 import socket
+import struct
 from enum import Enum
 
 
@@ -17,6 +18,7 @@ class PTZViscaSocket:
         self.address = address
         self.port = 5678
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+        self.socket.settimeout(5)
         self.socket.setblocking(False)
         try:
             self.socket.connect((self.address, self.port))
@@ -47,9 +49,25 @@ class PTZViscaSocket:
             return False
 
         data = self.socket.recv(1024)
-        if len(data) > 0:
-            print(data)
-            return True
+        flag = False
+        while not flag:
+            if len(data) > 0:
+                print(data)
+                bytes_list = struct.unpack(str(len(data)) + "c", data)
+                if len(data) >= 6:
+                    # If the first two bytes are 90
+                    if bytes_list[0] == b"9" and bytes_list[1] == b"0":
+                        # If the 3rd, 5th and 6th byte are correct, it worked
+                        if bytes_list[2] == b"5" and bytes_list[4] == b"F" and bytes_list[5] == b"F":
+                            flag = True
+                            return True
+                        # If the 3rd, 5th and 6th byte are not correct, it didn't
+                        elif bytes_list[2] == b"6" and bytes_list[4] == b"F" and bytes_list[5] == b"F":
+                            flag = True
+                            return False
+                else:
+                    return False
+
         return False
 
     def close(self):
