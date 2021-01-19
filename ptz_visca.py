@@ -19,7 +19,7 @@ class PTZViscaSocket:
         self.port = 5678
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         self.socket.settimeout(5)
-        self.socket.setblocking(False)
+        self.socket.setblocking(0)
         try:
             self.socket.connect((self.address, self.port))
             self.is_connected = True

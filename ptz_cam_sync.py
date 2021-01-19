@@ -97,10 +97,14 @@ class PTZCamSync:
 
 
 def do_exit(message):
-    print("The program ran into an error:")
-    print(message)
-    input("Press ENTER to exit...")
-    sys.exit()
+    if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
+        print("The program ran into an error:")
+        print(message)
+        input("Press ENTER to exit...")
+        sys.exit()
+    else:
+        print(message)
+        sys.exit()
 
 
 if __name__ == "__main__":
