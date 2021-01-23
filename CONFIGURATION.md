@@ -29,7 +29,7 @@ Create a new JSON object in the `cameras` section of the file with the following
         {   
           "id": 1,
           "address": "192.168.1.88",
-          "label": "Label for this camera"
+          "label": "Label for this camera",
           "presets": [
             {"name": "Preset Name", "preset_num": 1, "obs_scene": "Example Scene Name"},
             {"name": "Preset Name 2", "preset_num": 2, "obs_scene": "Example Scene Name 2"}
