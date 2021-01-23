@@ -77,6 +77,12 @@ class PTZCamSync:
             if camera["id"] == camera_id:
                 return camera
         return None
+    
+    def _get_camera_from_stash(self, camera_id, stash):
+        for camera in stash:
+            if camera["id"] == camera_id:
+                return camera
+        return None
 
     def _get_scene_for_preset(self, camera_id, preset_num):
         camera = self._get_camera(camera_id)
@@ -95,14 +101,51 @@ class PTZCamSync:
                 ptz_visca.close()
         do_exit("Closing gracefully...")
     
+    def add_camera(self, address):
+        self._cam_sockets[address] = PTZViscaSocket(address)
+    
+    def remove_cam(self, address):
+        ptz_visca = self._cam_sockets.get(address)
+        if ptz_visca is not None:
+            ptz_visca.close()
+            self._cam_sockets.pop(address)
+    
     def load_settings(self):
         """ Loads settings into self.settings and collects a list of cameras into self.cameras
         """
+        
         print("Loading settings from disk...")
         with open(os.path.join(__location__, "settings.json"), "r") as f:
             self.settings = json.load(f)
             f.close()
-        self.cameras = self.get_all_cameras()
+        new_stash = self.get_all_cameras()
+        if not hasattr(self, "cameras"):
+            self.cameras = new_stash
+            return
+        else:
+            # Get a list of the old and new camera ids from the settings we loaded
+            old_ids = [cam["id"] for cam in self.cameras]
+            new_ids = [cam["id"] for cam in new_stash]
+
+            # Find added and removed camera IDs
+            added_ids = list(set(new_ids) - set(old_ids))
+            missing_ids = list(set(old_ids) - set(new_ids))
+
+            # If there are cameras to add, get their address and add them
+            if len(added_ids) > 0:
+                for new_cam in added_ids:
+                    cam = self._get_camera(new_cam)
+                    if cam is not None:
+                        self.add_camera(cam["address"])
+            # If there are cameras to remove, get their address and remove them
+            if len(missing_ids) > 0:
+                for removed_cam in missing_ids:
+                    cam = self._get_camera_from_stash(removed_cam, self.cameras)
+                    if cam is not None:
+                        self.remove_cam(cam["address"])
+
+            # Store the new list of cameras
+            self.cameras = new_stash
 
 
 def do_exit(message):
@@ -130,16 +173,17 @@ class MainPTZWindow(Frame):
         # Camera management class init. Also starts the websocket
         self.cam_sync = PTZCamSync()
         self.master.protocol("WM_DELETE_WINDOW", self.cam_sync._handle_close)
+
+        # Add a menu bar with a reload option
+        menu_bar = Menu(self.master)
+        menu_bar.add_command(label="Reload All", command=self.init_window)
+        self.master.config(menu=menu_bar)
+
         # Makes width = 200 if it's less than that
         width = self.master.winfo_width() if self.master.winfo_width() >= 300 else 300
         height = self.master.winfo_height()
         self.master.minsize(width, height)
-        menu_bar = Menu(self.master)
-        file_bar = Menu(menu_bar, tearoff=False)
-        file_bar.add_command(label="Exit", command=self.master.quit)
 
-        menu_bar.add_command(label="Reload Window", command=self.init_window)
-        self.master.config(menu=menu_bar)
         self.main_frame = None
         self.init_window()
 
