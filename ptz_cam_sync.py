@@ -149,13 +149,8 @@ class PTZCamSync:
 
 
 def do_exit(message):
-    if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
-        print(message)
-        input("Press ENTER to exit...")
-        sys.exit()
-    else:
-        print(message)
-        sys.exit()
+    print(message)
+    sys.exit()
 
 
 class MainPTZWindow(Frame):
