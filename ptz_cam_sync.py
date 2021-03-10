@@ -1,15 +1,13 @@
 import json
 import os
 import sys
-from functools import partial
-from tkinter import Button, Frame, Menu, Tk, font, Label
+from tkinter import Button, Frame, Label, Menu, Tk, font, messagebox
 
 from obswebsocket import exceptions, obsws, requests
 
 from ptz_visca import PTZViscaSocket
 
 # Changes an internal path variable based on whether the application was built into an EXE or not.
-# Will be used for builds later on
 if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
     __location__ = os.path.dirname(sys.executable)
 else:
@@ -27,7 +25,7 @@ class OBSWebsocketHandler:
             self.ws.connect()
         except exceptions.ConnectionFailure:
             print("Connection was unsuccessful")
-            do_exit("OBS Must be open in order to use this application")
+            messagebox.showerror("Error", "OBS Must be open in order to use this application")
 
         # Get the scenes from OBS
         self.scenes = self._get_scenes()
@@ -61,13 +59,12 @@ class PTZCamSync:
         # Connect to the camera and send a control message
         ptz_visca = self._cam_sockets.get(address)
         if ptz_visca is not None:
-            if ptz_visca.is_connected:
-                sent = ptz_visca.change_preset(preset_num)
-                if not sent:
-                    print("Error sending a camera a preset command. "
-                          "Camera Address: {}, Preset Num: {}".format(address, preset_num))
+            sent, e = ptz_visca.change_preset(preset_num)
+            if not sent:
+                messagebox.showerror("Error", "Error sending a camera a preset command. "
+                                     "Camera Address: {}, Preset Num: {}. \nException: {}".format(address, preset_num, e))
         else:
-            print("No camera socket found with address: {}".format(address))
+            messagebox.showwarning("Warning", "No camera socket found with address: {}".format(address))
 
     def get_all_cameras(self):
         return [camera for camera in self.settings["cameras"]]
@@ -102,8 +99,10 @@ class PTZCamSync:
         do_exit("Closing gracefully...")
     
     def add_camera(self, address):
-        self._cam_sockets[address] = PTZViscaSocket(address)
-    
+        visca_socket = PTZViscaSocket(address)
+        if visca_socket.is_connected:
+            self._cam_sockets[address] = visca_socket
+            
     def remove_cam(self, address):
         ptz_visca = self._cam_sockets.get(address)
         if ptz_visca is not None:
@@ -137,6 +136,7 @@ class PTZCamSync:
                     cam = self._get_camera(new_cam)
                     if cam is not None:
                         self.add_camera(cam["address"])
+
             # If there are cameras to remove, get their address and remove them
             if len(missing_ids) > 0:
                 for removed_cam in missing_ids:
@@ -218,7 +218,7 @@ class MainPTZWindow(Frame):
                 scene = preset.get("obs_scene")
                 name = preset.get("name") or scene
                 if scene in self.cam_sync.obs_scenes:
-                    btn = Button(cam_frame, text=name, font=self.font, bg=self.btn_background_color, fg=self.text_color, command=partial(self.cam_sync.change_scene, preset_id, scene, cam_address))
+                    btn = Button(cam_frame, text=name, font=self.font, bg=self.btn_background_color, fg=self.text_color, command=lambda: self.cam_sync.change_scene(preset_id, scene, cam_address))
                     btn.pack(padx=5, pady=5, side="left")
                 else:
                     print("The scene \"{}\" was not found in your OBS configuration.".format(scene))

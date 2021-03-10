@@ -1,4 +1,5 @@
 import socket
+from tkinter import messagebox
 
 
 class PTZCommands:
@@ -11,9 +12,6 @@ class PTZCommands:
     # Camera recall preset command
     CAM_Memory_Recall = "8101043F02{preset_num_hex}FF"
 
-    # Completion messages (NOT SURE IF THIS CHANGES FOR EVERYONE! IT PERSISTED ACROSS RESTARTS!)
-    CAM_Completion_Q = b'\x90Q\xff'
-    CAM_Completion_R = b'\x90R\xff'
 
 class PTZViscaSocket:
     """An instance of a PTZ visca socket connection
@@ -21,19 +19,27 @@ class PTZViscaSocket:
     def __init__(self, address):
         self.address = address
         self.port = 5678
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-        self.socket.settimeout(10)
+        self.socket = None
+        self.is_connected = False
+        self.connect()
+        if not self.is_connected:
+            messagebox.showinfo("Info", "Unable to connect to camera at adddress: {}".format(self.address))
+
+    def is_my_socket(self, address):
+        return address == self.address
+
+    def connect(self):
         try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+            self.socket.settimeout(3)
             print("Trying to connect to: {}".format(self.address))
             self.socket.connect((self.address, self.port))
             self.is_connected = True
             print("Connected successfully!")
+            return
         except socket.error as e:
-            print("Error connecting to socket on address: {}.\nException: {}".format(address, e))
+            print("Error connecting to socket on address: {}.\nException: {}".format(self.address, e))
             self.is_connected = False
-
-    def is_my_socket(self, address):
-        return address == self.address
 
     def change_preset(self, preset_num):
         """Changes the camera's current position preset
@@ -43,26 +49,21 @@ class PTZViscaSocket:
         """
         if preset_num > 127 or preset_num < 0:
             print("Invalid preset number!")
-            return False
+            return False, "Invalid preset number: {}".format(preset_num)
         preset_hex = repr(chr(preset_num)).strip("'")[2:]
         data = bytes.fromhex(PTZCommands.CAM_Memory_Recall.format(preset_num_hex=preset_hex))
         try:
-            self.socket.send(data)
+            if not self.is_connected:
+                self.connect()
+            if self.is_connected:
+                self.socket.send(data)
+                return True, ""
+            else:
+                return False, "Error connecting to Camera"
         except socket.error as e:
             print("Error sending command to socket on address: {}.\nException: {}".format(self.address, e))
             self.is_connected = False
-            return False
-
-        total_data = []
-        flag = False
-        while not flag:
-            total_data.append(self.socket.recv(1024))
-            if PTZCommands.CAM_Completion_Q in total_data or PTZCommands.CAM_Completion_R in total_data:
-                total_data.clear()
-                flag = True
-                return True
-
-        return False
+            return False, e
 
     def close(self):
         print("Disconnecting from: {}".format(self.address))
