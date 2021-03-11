@@ -1,11 +1,13 @@
 import json
 import os
+import socket
 import sys
+from functools import partial
 from tkinter import Button, Frame, Label, Menu, Tk, font, messagebox
 
 from obswebsocket import exceptions, obsws, requests
 
-from ptz_visca import PTZViscaSocket
+from ptz_visca_commands import PTZViscaCommands
 
 # Changes an internal path variable based on whether the application was built into an EXE or not.
 if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
@@ -13,6 +15,11 @@ if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
 else:
     __location__ = os.path.realpath(os.path.join(os.getcwd(),
                                     os.path.dirname(__file__)))
+
+
+def do_exit(message):
+    print(message)
+    sys.exit()
 
 
 class OBSWebsocketHandler:
@@ -48,109 +55,48 @@ class PTZCamSync:
         self.ws_handler = OBSWebsocketHandler("127.0.0.1", 4444, self.settings["password"])
         self.ws = self.ws_handler.ws
         self.obs_scenes = [x["name"] for x in self.ws_handler.scenes]
-
-        # Connect to all the cameras
-        self._cam_sockets = {camera["address"]: PTZViscaSocket(camera["address"]) for camera in self.cameras}
-
-    def change_scene(self, preset_num, scene, address):
-        # Change the OBS Scene
-        self.ws_handler.change_scene(scene)
         
-        # Connect to the camera and send a control message
-        ptz_visca = self._cam_sockets.get(address)
-        if ptz_visca is not None:
-            sent, e = ptz_visca.change_preset(preset_num)
-            if not sent:
-                messagebox.showerror("Error", "Error sending a camera a preset command. "
-                                     "Camera Address: {}, Preset Num: {}. \nException: {}".format(address, preset_num, e))
+        # The port for camera control
+        self.udp_port = 1259
+       
+    def change_scene(self, preset_num, scene, address):
+        """Changes the camera preset and the OBS scene
+
+        Args:
+            preset_num (int): The preset number in range: 1-126
+            scene (str): OBS Scene name to switch to
+            address ([type]): IP Address of the camera to communicate with
+        """
+        if preset_num > 127 or preset_num < 0:
+            messagebox.showerror("Error", "Cannot have a preset number outside range: 1-126!"
+                                          "\nScene name: {}, Camera Address: {}".format(scene, address))
         else:
-            messagebox.showwarning("Warning", "No camera socket found with address: {}".format(address))
-
-    def get_all_cameras(self):
-        return [camera for camera in self.settings["cameras"]]
-
-    def _get_camera(self, camera_id):
-        for camera in self.settings["cameras"]:
-            if camera["id"] == camera_id:
-                return camera
-        return None
-    
-    def _get_camera_from_stash(self, camera_id, stash):
-        for camera in stash:
-            if camera["id"] == camera_id:
-                return camera
-        return None
-
-    def _get_scene_for_preset(self, camera_id, preset_num):
-        camera = self._get_camera(camera_id)
-        for preset in camera["presets"]:
-            if preset["preset_num"] == preset_num:
-                return preset["obs_scene"]
-        return None
-    
-    def _handle_close(self):
-        for camera in self.cameras:
-            address = camera.get("address")
-            if address is None:
-                continue
-            ptz_visca = self._cam_sockets.get(address)
-            if ptz_visca is not None:
-                ptz_visca.close()
-        do_exit("Closing gracefully...")
-    
-    def add_camera(self, address):
-        visca_socket = PTZViscaSocket(address)
-        if visca_socket.is_connected:
-            self._cam_sockets[address] = visca_socket
-            
-    def remove_cam(self, address):
-        ptz_visca = self._cam_sockets.get(address)
-        if ptz_visca is not None:
-            ptz_visca.close()
-            self._cam_sockets.pop(address)
+            try:
+                # Make a new socket
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.settimeout(3)
+                # Connect to the camera addres
+                sock.connect((address, self.udp_port))
+                # Create the bytes to send to change the preset
+                preset_hex = repr(chr(preset_num)).strip("'")[2:]
+                data = PTZViscaCommands.CAM_Memory_Recall(preset_hex)
+                # Send the data and close the socket
+                sock.send(data)
+                sock.close()
+                # Change the OBS Scene
+                self.ws_handler.change_scene(scene)
+            except socket.error as e:
+                messagebox.showerror("Error", "Error sending a camera a preset command!"
+                                     "\nAddress: {}, Preset Num: {}. \nSocket Exception: {}".format(address, preset_num, e))
     
     def load_settings(self):
         """ Loads settings into self.settings and collects a list of cameras into self.cameras
         """
-        
         print("Loading settings from disk...")
         with open(os.path.join(__location__, "settings.json"), "r") as f:
             self.settings = json.load(f)
             f.close()
-        new_stash = self.get_all_cameras()
-        if not hasattr(self, "cameras"):
-            self.cameras = new_stash
-            return
-        else:
-            # Get a list of the old and new camera ids from the settings we loaded
-            old_ids = [cam["id"] for cam in self.cameras]
-            new_ids = [cam["id"] for cam in new_stash]
-
-            # Find added and removed camera IDs
-            added_ids = list(set(new_ids) - set(old_ids))
-            missing_ids = list(set(old_ids) - set(new_ids))
-
-            # If there are cameras to add, get their address and add them
-            if len(added_ids) > 0:
-                for new_cam in added_ids:
-                    cam = self._get_camera(new_cam)
-                    if cam is not None:
-                        self.add_camera(cam["address"])
-
-            # If there are cameras to remove, get their address and remove them
-            if len(missing_ids) > 0:
-                for removed_cam in missing_ids:
-                    cam = self._get_camera_from_stash(removed_cam, self.cameras)
-                    if cam is not None:
-                        self.remove_cam(cam["address"])
-
-            # Store the new list of cameras
-            self.cameras = new_stash
-
-
-def do_exit(message):
-    print(message)
-    sys.exit()
+        self.cameras = [camera for camera in self.settings["cameras"]]
 
 
 class MainPTZWindow(Frame):
@@ -167,7 +113,6 @@ class MainPTZWindow(Frame):
 
         # Camera management class init. Also starts the websocket
         self.cam_sync = PTZCamSync()
-        self.master.protocol("WM_DELETE_WINDOW", self.cam_sync._handle_close)
 
         # Add a menu bar with a reload option
         menu_bar = Menu(self.master)
@@ -184,33 +129,34 @@ class MainPTZWindow(Frame):
 
     def init_window(self):
         if self.main_frame is None:
-            # Main window frame
+            # Make main window frame
             self.main_frame = Frame(self.master)
             self.main_frame.configure(bg=self.background_color)
             self.main_frame.pack(fill="both", expand=1)
         else:
+            # Main frame exists so we are reloading. Destroy it and recreate it
             self.main_frame.destroy()
             self.cam_sync.load_settings()
             self.main_frame = Frame(self.master)
             self.main_frame.configure(bg=self.background_color)
             self.main_frame.pack(fill="both", expand=1)
 
-        cam_frames = []
         # Setup Tkinter buttons to change OBS scenes and change camera presets.
         for camera in self.cam_sync.cameras:
-            cam_frame = Frame(self.main_frame)
-            cam_frames.append(cam_frame)
-            cam_frame.configure(bg=self.background_color)
-            cam_frame.pack(fill="x")
             cam_address = camera.get("address")
+            cam_id = camera.get("id") or "Unknown"
             if cam_address is None:
-                print("A camera in the config has no address listed!")
+                messagebox.showinfo("Info", "A camera in the config has no address listed!"
+                                    "\nCamera ID: {}".format(cam_id))
+                continue
             presets = camera.get("presets")
             if presets is None:
-                print("Camera at {} has no presets listed!".format(cam_address))
+                messagebox.showinfo("Info", "Camera at {} has no presets listed!".format(cam_address))
                 continue
-            cam_id = camera.get("id") or "Unknown"
             cam_label = camera.get("label") or "Camera {}".format(cam_id)
+            cam_frame = Frame(self.main_frame)
+            cam_frame.configure(bg=self.background_color)
+            cam_frame.pack(fill="x")
             label = Label(cam_frame, text=cam_label, font=self.font, bg=self.background_color, fg=self.text_color)
             label.pack(padx=5, pady=5, side="left")
             for preset in presets:
@@ -218,10 +164,11 @@ class MainPTZWindow(Frame):
                 scene = preset.get("obs_scene")
                 name = preset.get("name") or scene
                 if scene in self.cam_sync.obs_scenes:
-                    btn = Button(cam_frame, text=name, font=self.font, bg=self.btn_background_color, fg=self.text_color, command=lambda: self.cam_sync.change_scene(preset_id, scene, cam_address))
+                    btn = Button(cam_frame, text=name, font=self.font, bg=self.btn_background_color, fg=self.text_color, command=partial(self.cam_sync.change_scene, preset_id, scene, cam_address))
                     btn.pack(padx=5, pady=5, side="left")
                 else:
-                    print("The scene \"{}\" was not found in your OBS configuration.".format(scene))
+                    messagebox.showinfo("Info", "The scene \"{}\" was not found in your OBS configuration."
+                                        "\nCamera ID: {}".format(scene, cam_id))
 
         self.master.update()
 
