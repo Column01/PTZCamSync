@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from functools import partial
 from tkinter import Button, Frame, Label, Menu, Tk, font, messagebox
 
 from obswebsocket import exceptions, obsws, requests
@@ -218,7 +219,7 @@ class MainPTZWindow(Frame):
                 scene = preset.get("obs_scene")
                 name = preset.get("name") or scene
                 if scene in self.cam_sync.obs_scenes:
-                    btn = Button(cam_frame, text=name, font=self.font, bg=self.btn_background_color, fg=self.text_color, command=lambda: self.cam_sync.change_scene(preset_id, scene, cam_address))
+                    btn = Button(cam_frame, text=name, font=self.font, bg=self.btn_background_color, fg=self.text_color, command=partial(self.cam_sync.change_scene, preset_id, scene, cam_address))
                     btn.pack(padx=5, pady=5, side="left")
                 else:
                     print("The scene \"{}\" was not found in your OBS configuration.".format(scene))
