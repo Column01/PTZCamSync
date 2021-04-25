@@ -1,11 +1,13 @@
+import datetime
 import json
+import logging
 import os
 import socket
 import sys
 from functools import partial
 from tkinter import Button, Frame, Label, Menu, Tk, font, messagebox
 
-from obswebsocket import exceptions, obsws, requests
+from obswebsocket import events, exceptions, obsws, requests
 
 from ptz_visca_commands import PTZViscaCommands
 
@@ -54,11 +56,36 @@ class PTZCamSync:
         # Connect to obs and collect scenes
         self.ws_handler = OBSWebsocketHandler("127.0.0.1", 4444, self.settings["password"])
         self.ws = self.ws_handler.ws
+        # Add a event handler for the stream status to log info about it.
+        self.ws.register(self.stream_status, event=events.StreamStatus)
         self.obs_scenes = [x["name"] for x in self.ws_handler.scenes]
-        
+
+        self.logger = logging.getLogger("PTZCamSync")
+
+        log_name = os.path.join(__location__, "logs", "Stream Health - " + datetime.datetime.now().strftime("%d-%m-%Y") + ".log")
+        if not os.path.exists(os.path.join(__location__, "logs")):
+            os.mkdir(os.path.join(__location__, "logs"))
+        handler = logging.FileHandler(filename=log_name, encoding="utf-8", mode="a")
+        formatter = logging.Formatter('[%(asctime)s] - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        self.logger.setLevel(logging.INFO)
+        self.logger.propagate = False
+
         # The port for camera control
         self.udp_port = 1259
-       
+    
+    def stream_status(self, message):
+        streaming = message.getStreaming()
+        recording = message.getRecording()
+        stream_len = datetime.timedelta(seconds=message.getTotalStreamTime())
+        dropped_percentage = message.getStrain()
+        kbps = message.getKbitsPerSec()
+        total_dropped = message.getNumDroppedFrames()
+        self.logger.info("Streaming: {}, Recording: {}".format(streaming, recording))
+        self.logger.info("Stream length: {}, Dropped frames percentage: {}, Stream KBPS: {}".format(stream_len, dropped_percentage, kbps))
+        self.logger.info("Total dropped frames: {}\n".format(total_dropped))
+
     def change_scene(self, preset_num, scene, address):
         """Changes the camera preset and the OBS scene
 
@@ -117,6 +144,7 @@ class MainPTZWindow(Frame):
         # Add a menu bar with a reload option
         menu_bar = Menu(self.master)
         menu_bar.add_command(label="Reload All", command=self.init_window)
+        menu_bar.add_command(label="Start/Stop Stream", command=self.toggle_stream)
         self.master.config(menu=menu_bar)
 
         # Makes width = 200 if it's less than that
@@ -171,13 +199,16 @@ class MainPTZWindow(Frame):
                                         "\nCamera ID: {}".format(scene, cam_id))
 
         self.master.update()
+    
+    def toggle_stream(self):
+        # Toggle the stream and recording
+        self.cam_sync.ws.call(requests.StartStopRecording())
+        self.cam_sync.ws.call(requests.StartStopStreaming())
 
 
 if __name__ == "__main__":
     # Main window
     root = Tk()
-
     main_window = MainPTZWindow(root)
-
     # Start the app
     root.mainloop()
