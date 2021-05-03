@@ -23,7 +23,8 @@ Create a new JSON object in the `cameras` section of the file with the following
 
 ## Config example
 
-    {   
+    { 
+      "stream_health": true,
       "password": "$tr0ng_pa$$w0rd",
       "cameras": [
         {   
