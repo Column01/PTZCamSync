@@ -1,6 +1,6 @@
 import datetime
 import json
-import logging
+import csv
 import os
 import socket
 import sys
@@ -53,38 +53,45 @@ class PTZCamSync:
         # Load settings and init cameras
         self.load_settings()
         
+        # Get whether to log the stream health or not
+        self.stream_health = self.settings.get("stream_health") or False
+
         # Connect to obs and collect scenes
         self.ws_handler = OBSWebsocketHandler("127.0.0.1", 4444, self.settings["password"])
         self.ws = self.ws_handler.ws
-        # Add a event handler for the stream status to log info about it.
-        self.ws.register(self.stream_status, event=events.StreamStatus)
         self.obs_scenes = [x["name"] for x in self.ws_handler.scenes]
 
-        self.logger = logging.getLogger("PTZCamSync")
-
-        log_name = os.path.join(__location__, "logs", "Stream Health - " + datetime.datetime.now().strftime("%d-%m-%Y") + ".log")
-        if not os.path.exists(os.path.join(__location__, "logs")):
-            os.mkdir(os.path.join(__location__, "logs"))
-        handler = logging.FileHandler(filename=log_name, encoding="utf-8", mode="a")
-        formatter = logging.Formatter('[%(asctime)s] - %(message)s')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        self.logger.setLevel(logging.INFO)
-        self.logger.propagate = False
+        if self.stream_health:
+            print("Starting stream health log")
+            # Add a event handler for the stream status to log info about it.
+            self.ws.register(self.stream_status, event=events.StreamStatus)
+            log_name = os.path.join(__location__, "logs", "Stream Health - " + datetime.datetime.now().strftime("%d-%m-%Y %H-%M-%S") + ".csv")
+            if not os.path.exists(os.path.join(__location__, "logs")):
+                os.mkdir(os.path.join(__location__, "logs"))
+            
+            # Set the fields and write the header to the stream health file
+            fields = ["time", "streaming", "recording", "stream_len", "drop_perc", "total_drop", "bitrate"]
+            self.csv_file = open(log_name, "w+", newline="")
+            self.csv_writer = csv.DictWriter(self.csv_file, fieldnames=fields)
+            self.csv_writer.writeheader()
+            self.csv_file.flush()
 
         # The port for camera control
         self.udp_port = 1259
     
     def stream_status(self, message):
-        streaming = message.getStreaming()
-        recording = message.getRecording()
-        stream_len = datetime.timedelta(seconds=message.getTotalStreamTime())
-        dropped_percentage = message.getStrain()
-        kbps = message.getKbitsPerSec()
-        total_dropped = message.getNumDroppedFrames()
-        self.logger.info("Streaming: {}, Recording: {}".format(streaming, recording))
-        self.logger.info("Stream length: {}, Dropped frames percentage: {}, Stream KBPS: {}".format(stream_len, dropped_percentage, kbps))
-        self.logger.info("Total dropped frames: {}\n".format(total_dropped))
+        if self.stream_health:
+            row = {
+                "time": datetime.datetime.now().strftime("%H:%M:%S"),
+                "streaming": message.getStreaming(),
+                "recording": message.getRecording(),
+                "stream_len": datetime.timedelta(seconds=message.getTotalStreamTime()),
+                "drop_perc": message.getStrain(),
+                "total_drop": message.getNumDroppedFrames(),
+                "bitrate": message.getKbitsPerSec()
+            }
+            self.csv_writer.writerow(row)
+            self.csv_file.flush()
 
     def change_scene(self, preset_num, scene, address):
         """Changes the camera preset and the OBS scene
