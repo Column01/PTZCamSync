@@ -148,6 +148,7 @@ class MainPTZWindow(Frame):
         # Camera management class init. Also starts the websocket
         self.cam_sync = PTZCamSync()
 
+        self.always_on_top = self.cam_sync.settings.get("always_on_top") or False
         # Add a menu bar with a reload option
         menu_bar = Menu(self.master)
         menu_bar.add_command(label="Reload All", command=self.init_window)
@@ -217,5 +218,7 @@ if __name__ == "__main__":
     # Main window
     root = Tk()
     main_window = MainPTZWindow(root)
+    if main_window.always_on_top:
+        root.attributes("-topmost", True)
     # Start the app
     root.mainloop()
